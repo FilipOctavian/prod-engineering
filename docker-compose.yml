@@ -19,6 +19,8 @@ services:
       - 8082:8080
       - 50000:50000
     restart: on-failure
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ${JENKINS_CONFIG_ROOT:-/workspaces/jenkins_config}:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
@@ -140,3 +142,4 @@ services:
       driver: loki
       options:
         loki-url: "http://loki:3100/loki/api/v1/push"
+
