@@ -81,7 +81,7 @@ pipeline {
 
         stage('Integration Tests') {
             steps {
-                sh 'TESTCONTAINERS_RYUK_DISABLED=true TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal ./gradlew testIT'
+                sh 'MONGODB_CONECTION_URL=mongodb://root:example@host.docker.internal:27017 ./gradlew testIT'
             }
         }
 
