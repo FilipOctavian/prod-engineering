@@ -85,7 +85,9 @@ public class AutoServiceCatalogService {
                 null,
                 request.firstName(),
                 request.lastName(),
-                request.phone()
+                request.phone(),
+                0.0,
+                0
         ));
     }
 

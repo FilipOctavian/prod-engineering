@@ -120,7 +120,7 @@ class AutoServiceCatalogServiceTest {
     @Test
     void createMechanic_savesMechanic() {
         CreateMechanicRequest request = new CreateMechanicRequest("Ion", "Ionescu", "0722");
-        MechanicEntity savedMechanic = new MechanicEntity("mech-1", "Ion", "Ionescu", "0722");
+        MechanicEntity savedMechanic = new MechanicEntity("mech-1", "Ion", "Ionescu", "0722", 0.0, 0);
 
         when(mechanicRepository.save(any(MechanicEntity.class))).thenReturn(savedMechanic);
 
@@ -164,7 +164,7 @@ class AutoServiceCatalogServiceTest {
     @Test
     void getAllMethods_returnRepositoryData() {
         when(clientRepository.findAll()).thenReturn(List.of(new ClientEntity("client-1", "Ana", "Popescu", "0711", "ana@example.com", "Bucharest")));
-        when(mechanicRepository.findAll()).thenReturn(List.of(new MechanicEntity("mech-1", "Ion", "Ionescu", "0722")));
+        when(mechanicRepository.findAll()).thenReturn(List.of(new MechanicEntity("mech-1", "Ion", "Ionescu", "0722", 0.0, 0)));
         when(supplierRepository.findAll()).thenReturn(List.of(new SupplierEntity("sup-1", "Auto Parts", "Bucharest", "021")));
         when(partRepository.findAll()).thenReturn(List.of(new PartEntity("part-1", "Filter", 10, BigDecimal.ONE, "sup-1")));
 

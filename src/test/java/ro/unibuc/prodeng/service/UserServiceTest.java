@@ -147,4 +147,69 @@ class UserServiceTest {
         // Act & Assert
         assertThrows(EntityNotFoundException.class, () -> userService.deleteUser("999"));
     }
+
+    @Test
+    void testCreateUser_duplicateEmail_throwsIllegalArgumentException() {
+        // Arrange
+        CreateUserRequest request = new CreateUserRequest("Alice", "alice@example.com");
+        when(userRepository.findByEmail("alice@example.com"))
+                .thenReturn(Optional.of(new UserEntity("1", "Alice", "alice@example.com")));
+
+        // Act & Assert
+        assertThrows(IllegalArgumentException.class, () -> userService.createUser(request));
+        verify(userRepository, never()).save(any(UserEntity.class));
+    }
+
+    @Test
+    void testGetUserByEmail_existingUserRequested_returnsUser() throws EntityNotFoundException {
+        // Arrange
+        UserEntity user = new UserEntity("1", "Alice", "alice@example.com");
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
+
+        // Act
+        UserResponse result = userService.getUserByEmail("alice@example.com");
+
+        // Assert
+        assertNotNull(result);
+        assertEquals("Alice", result.name());
+        assertEquals("alice@example.com", result.email());
+    }
+
+    @Test
+    void testGetUserByEmail_nonExistingUserRequested_throwsEntityNotFoundException() {
+        // Arrange
+        when(userRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(EntityNotFoundException.class, () -> userService.getUserByEmail("ghost@example.com"));
+    }
+
+    @Test
+    void testGetUserEntityById_existingUserRequested_returnsUserEntity() throws EntityNotFoundException {
+        // Arrange
+        UserEntity user = new UserEntity("1", "Alice", "alice@example.com");
+        when(userRepository.findById("1")).thenReturn(Optional.of(user));
+
+        // Act
+        UserEntity result = userService.getUserEntityById("1");
+
+        // Assert
+        assertNotNull(result);
+        assertEquals("1", result.id());
+        assertEquals("Alice", result.name());
+    }
+
+    @Test
+    void testGetUserEntityByEmail_existingUserRequested_returnsUserEntity() throws EntityNotFoundException {
+        // Arrange
+        UserEntity user = new UserEntity("1", "Alice", "alice@example.com");
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
+
+        // Act
+        UserEntity result = userService.getUserEntityByEmail("alice@example.com");
+
+        // Assert
+        assertNotNull(result);
+        assertEquals("alice@example.com", result.email());
+    }
 }

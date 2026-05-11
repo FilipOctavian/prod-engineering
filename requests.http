@@ -197,3 +197,44 @@ Content-Type: application/json
     "quantity": 15,
     "deliveredAt": "2026-03-05T08:30:00"
 }
+
+
+# ==========================================
+# Review Endpoints
+# ==========================================
+
+### Create a review
+# @name createReview
+POST http://localhost:8080/api/reviews
+Content-Type: application/json
+
+{
+    "mechanicId": "{{createMechanic.response.body.id}}",
+    "serviceOrderId": "{{createOrder.response.body.id}}",
+    "rating": 5,
+    "comment": "Excellent service, very professional!"
+}
+
+### Get all reviews for a mechanic
+GET http://localhost:8080/api/reviews/mechanic/{{createMechanic.response.body.id}}
+
+### Get average rating for a mechanic
+GET http://localhost:8080/api/reviews/mechanic/{{createMechanic.response.body.id}}/average
+
+### Delete a review
+DELETE http://localhost:8080/api/reviews/{{createReview.response.body.id}}
+
+# Car History Endpoints
+# ==========================================
+
+### Get full service history for a car
+GET http://localhost:8080/api/car-history/{{createCar.response.body.id}}
+
+### Get service history summary for a car
+GET http://localhost:8080/api/car-history/{{createCar.response.body.id}}/summary
+
+### Get completed orders for a car
+GET http://localhost:8080/api/car-history/{{createCar.response.body.id}}/completed
+
+### Get active (in-progress) order for a car
+GET http://localhost:8080/api/car-history/{{createCar.response.body.id}}/active
