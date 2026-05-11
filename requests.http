@@ -223,3 +223,18 @@ GET http://localhost:8080/api/reviews/mechanic/{{createMechanic.response.body.id
 
 ### Delete a review
 DELETE http://localhost:8080/api/reviews/{{createReview.response.body.id}}
+
+# Car History Endpoints
+# ==========================================
+
+### Get full service history for a car
+GET http://localhost:8080/api/car-history/{{createCar.response.body.id}}
+
+### Get service history summary for a car
+GET http://localhost:8080/api/car-history/{{createCar.response.body.id}}/summary
+
+### Get completed orders for a car
+GET http://localhost:8080/api/car-history/{{createCar.response.body.id}}/completed
+
+### Get active (in-progress) order for a car
+GET http://localhost:8080/api/car-history/{{createCar.response.body.id}}/active
