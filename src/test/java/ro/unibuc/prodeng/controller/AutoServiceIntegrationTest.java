@@ -2,6 +2,7 @@ package ro.unibuc.prodeng.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -135,6 +136,171 @@ class AutoServiceIntegrationTest extends IntegrationTestBase {
 
         PartEntity updatedPart = partRepository.findById("part-1").orElseThrow();
         assertEquals(12, updatedPart.availableStock());
+    }
+
+    @Test
+    void completeOrder_shouldPersistCompletedStatusAndBeReturnedByStatusFilter() throws Exception {
+        seedCatalog(10);
+
+        String createOrderPayload = """
+                {
+                  "carId": "car-1",
+                  "mechanicId": "mechanic-1",
+                  "serviceName": "Revizie completa",
+                  "description": "Schimb ulei si filtru",
+                  "laborCost": 200.0,
+                  "scheduledAt": "2026-03-05T10:00:00",
+                  "requiredParts": [
+                    {
+                      "partId": "part-1",
+                      "quantity": 2
+                    }
+                  ]
+                }
+                """;
+
+        String responseBody = mockMvc.perform(post("/api/service-orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createOrderPayload))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String orderId = objectMapper.readTree(responseBody).get("id").asText();
+
+        mockMvc.perform(patch("/api/service-orders/" + orderId + "/complete"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.completedAt").exists());
+
+        ServiceOrderEntity updatedOrder = serviceOrderRepository.findById(orderId).orElseThrow();
+        assertEquals(OrderStatus.COMPLETED, updatedOrder.status());
+
+        mockMvc.perform(get("/api/service-orders").param("status", "COMPLETED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(orderId))
+                .andExpect(jsonPath("$[0].status").value("COMPLETED"));
+    }
+
+    @Test
+    void receiveDelivery_whenSupplierDoesNotMatch_shouldReturnBadRequestWithoutChangingStock() throws Exception {
+        seedCatalog(5);
+        supplierRepository.save(new SupplierEntity(
+                "supplier-2",
+                "Another Supplier",
+                "Bd. Unirii 10",
+                "0210000000"
+        ));
+
+        String deliveryPayload = """
+                {
+                  "partId": "part-1",
+                  "supplierId": "supplier-2",
+                  "quantity": 7,
+                  "deliveredAt": "2026-03-05T08:30:00"
+                }
+                """;
+
+        mockMvc.perform(patch("/api/deliveries/receive")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(deliveryPayload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").exists());
+
+        PartEntity unchangedPart = partRepository.findById("part-1").orElseThrow();
+        assertEquals(5, unchangedPart.availableStock());
+    }
+
+    @Test
+    void createClientCarSupplierPartFlow_shouldPersistCatalogData() throws Exception {
+        String clientPayload = """
+                {
+                  "firstName": "Mihai",
+                  "lastName": "Ionescu",
+                  "phone": "0722111222",
+                  "email": "mihai.flow@example.com",
+                  "address": "Bucuresti"
+                }
+                """;
+
+        String clientResponse = mockMvc.perform(post("/api/clients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(clientPayload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value("mihai.flow@example.com"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String clientId = objectMapper.readTree(clientResponse).get("id").asText();
+
+        String carPayload = """
+                {
+                  "brand": "Dacia",
+                  "model": "Logan",
+                  "fabricationYear": 2020,
+                  "plateNumber": "B-55-FLW",
+                  "clientId": "%s"
+                }
+                """.formatted(clientId);
+
+        mockMvc.perform(post("/api/cars")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(carPayload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.clientId").value(clientId));
+
+        String supplierPayload = """
+                {
+                  "name": "Flow Supplier",
+                  "address": "Calea Victoriei 1",
+                  "phone": "0211234567"
+                }
+                """;
+
+        String supplierResponse = mockMvc.perform(post("/api/suppliers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(supplierPayload))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String supplierId = objectMapper.readTree(supplierResponse).get("id").asText();
+
+        String partPayload = """
+                {
+                  "name": "Filtru aer",
+                  "availableStock": 9,
+                  "unitPrice": 55.0,
+                  "supplierId": "%s"
+                }
+                """.formatted(supplierId);
+
+        mockMvc.perform(post("/api/parts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(partPayload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.supplierId").value(supplierId))
+                .andExpect(jsonPath("$.availableStock").value(9));
+
+        mockMvc.perform(get("/api/clients"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+
+        mockMvc.perform(get("/api/cars/by-client/" + clientId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+
+        mockMvc.perform(get("/api/suppliers"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+
+        mockMvc.perform(get("/api/parts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
     }
 
     @Test

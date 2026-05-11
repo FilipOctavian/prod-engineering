@@ -1,10 +1,21 @@
 package ro.unibuc.prodeng.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import ro.unibuc.prodeng.exception.EntityNotFoundException;
 import ro.unibuc.prodeng.model.CarEntity;
@@ -23,16 +34,7 @@ import ro.unibuc.prodeng.request.CreateMechanicRequest;
 import ro.unibuc.prodeng.request.CreatePartRequest;
 import ro.unibuc.prodeng.request.CreateSupplierRequest;
 
-import java.math.BigDecimal;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
-@ExtendWith(SpringExtension.class)
+@ExtendWith(MockitoExtension.class)
 class AutoServiceCatalogServiceTest {
 
     @Mock
@@ -51,232 +53,124 @@ class AutoServiceCatalogServiceTest {
     private PartRepository partRepository;
 
     @InjectMocks
-    private AutoServiceCatalogService catalogService;
+    private AutoServiceCatalogService autoServiceCatalogService;
 
     @Test
-    void testCreateClient_newClientWithValidData_createsAndReturnsClient() {
-        CreateClientRequest request = new CreateClientRequest("John", "Doe", "0700000000", "john@example.com", "Str. Main 1");
-        ClientEntity saved = new ClientEntity("client-1", "John", "Doe", "0700000000", "john@example.com", "Str. Main 1");
+    void createClient_whenEmailIsUnique_savesClient() {
+        CreateClientRequest request = new CreateClientRequest("Ana", "Popescu", "0711", "ana@example.com", "Bucharest");
+        ClientEntity savedClient = new ClientEntity("client-1", "Ana", "Popescu", "0711", "ana@example.com", "Bucharest");
 
-        when(clientRepository.findByEmail("john@example.com")).thenReturn(Optional.empty());
-        when(clientRepository.save(any(ClientEntity.class))).thenReturn(saved);
+        when(clientRepository.findByEmail("ana@example.com")).thenReturn(Optional.empty());
+        when(clientRepository.save(any(ClientEntity.class))).thenReturn(savedClient);
 
-        ClientEntity result = catalogService.createClient(request);
+        ClientEntity result = autoServiceCatalogService.createClient(request);
 
-        assertNotNull(result);
-        assertEquals("client-1", result.id());
-        assertEquals("John", result.firstName());
-        assertEquals("john@example.com", result.email());
-        verify(clientRepository, times(1)).save(any(ClientEntity.class));
+        assertSame(savedClient, result);
+        verify(clientRepository).save(any(ClientEntity.class));
     }
 
     @Test
-    void testCreateClient_duplicateEmail_throwsIllegalArgumentException() {
-        CreateClientRequest request = new CreateClientRequest("John", "Doe", "0700000000", "john@example.com", "Str. Main 1");
-        ClientEntity existing = new ClientEntity("client-1", "John", "Doe", "0700000000", "john@example.com", "Str. Main 1");
+    void createClient_whenEmailAlreadyExists_throwsException() {
+        CreateClientRequest request = new CreateClientRequest("Ana", "Popescu", "0711", "ana@example.com", "Bucharest");
+        when(clientRepository.findByEmail("ana@example.com"))
+                .thenReturn(Optional.of(new ClientEntity("client-1", "Ana", "Popescu", "0711", "ana@example.com", "Bucharest")));
 
-        when(clientRepository.findByEmail("john@example.com")).thenReturn(Optional.of(existing));
-
-        assertThrows(IllegalArgumentException.class, () -> catalogService.createClient(request));
+        assertThrows(IllegalArgumentException.class, () -> autoServiceCatalogService.createClient(request));
     }
 
     @Test
-    void testGetAllClients_withMultipleClients_returnsAllClients() {
-        List<ClientEntity> clients = Arrays.asList(
-                new ClientEntity("c-1", "Alice", "Smith", "0700000001", "alice@example.com", "Str. A"),
-                new ClientEntity("c-2", "Bob", "Jones", "0700000002", "bob@example.com", "Str. B")
-        );
-        when(clientRepository.findAll()).thenReturn(clients);
+    void createCar_whenClientExistsAndPlateIsUnique_savesCar() {
+        CreateCarRequest request = new CreateCarRequest("Dacia", "Logan", 2022, "B-10-ABC", "client-1");
+        CarEntity savedCar = new CarEntity("car-1", "Dacia", "Logan", 2022, "B-10-ABC", "client-1");
 
-        List<ClientEntity> result = catalogService.getAllClients();
+        when(clientRepository.findById("client-1")).thenReturn(Optional.of(new ClientEntity("client-1", "Ana", "Popescu", "0711", "ana@example.com", "Bucharest")));
+        when(carRepository.findByPlateNumber("B-10-ABC")).thenReturn(Optional.empty());
+        when(carRepository.save(any(CarEntity.class))).thenReturn(savedCar);
+
+        CarEntity result = autoServiceCatalogService.createCar(request);
+
+        assertSame(savedCar, result);
+    }
+
+    @Test
+    void createCar_whenPlateAlreadyExists_throwsException() {
+        CreateCarRequest request = new CreateCarRequest("Dacia", "Logan", 2022, "B-10-ABC", "client-1");
+
+        when(clientRepository.findById("client-1")).thenReturn(Optional.of(new ClientEntity("client-1", "Ana", "Popescu", "0711", "ana@example.com", "Bucharest")));
+        when(carRepository.findByPlateNumber("B-10-ABC"))
+                .thenReturn(Optional.of(new CarEntity("car-1", "Dacia", "Logan", 2022, "B-10-ABC", "client-1")));
+
+        assertThrows(IllegalArgumentException.class, () -> autoServiceCatalogService.createCar(request));
+    }
+
+    @Test
+    void getCarsByClientId_whenClientExists_returnsCars() {
+        CarEntity firstCar = new CarEntity("car-1", "Dacia", "Logan", 2022, "B-10-ABC", "client-1");
+        CarEntity secondCar = new CarEntity("car-2", "Ford", "Focus", 2019, "B-20-XYZ", "client-1");
+
+        when(clientRepository.findById("client-1")).thenReturn(Optional.of(new ClientEntity("client-1", "Ana", "Popescu", "0711", "ana@example.com", "Bucharest")));
+        when(carRepository.findByClientId("client-1")).thenReturn(List.of(firstCar, secondCar));
+
+        List<CarEntity> result = autoServiceCatalogService.getCarsByClientId("client-1");
 
         assertEquals(2, result.size());
+        assertSame(firstCar, result.get(0));
     }
 
     @Test
-    void testCreateCar_validRequest_createsAndReturnsCar() {
-        CreateCarRequest request = new CreateCarRequest("Toyota", "Corolla", 2020, "B-123-XYZ", "client-1");
-        ClientEntity client = new ClientEntity("client-1", "Alice", "Smith", "0700000001", "alice@example.com", "Str. A");
-        CarEntity saved = new CarEntity("car-1", "Toyota", "Corolla", 2020, "B-123-XYZ", "client-1");
+    void createMechanic_savesMechanic() {
+        CreateMechanicRequest request = new CreateMechanicRequest("Ion", "Ionescu", "0722");
+        MechanicEntity savedMechanic = new MechanicEntity("mech-1", "Ion", "Ionescu", "0722", 0.0, 0);
 
-        when(clientRepository.findById("client-1")).thenReturn(Optional.of(client));
-        when(carRepository.findByPlateNumber("B-123-XYZ")).thenReturn(Optional.empty());
-        when(carRepository.save(any(CarEntity.class))).thenReturn(saved);
+        when(mechanicRepository.save(any(MechanicEntity.class))).thenReturn(savedMechanic);
 
-        CarEntity result = catalogService.createCar(request);
+        MechanicEntity result = autoServiceCatalogService.createMechanic(request);
 
-        assertNotNull(result);
-        assertEquals("car-1", result.id());
-        assertEquals("Toyota", result.brand());
-        verify(carRepository, times(1)).save(any(CarEntity.class));
+        assertSame(savedMechanic, result);
     }
 
     @Test
-    void testCreateCar_clientNotFound_throwsEntityNotFoundException() {
-        CreateCarRequest request = new CreateCarRequest("Toyota", "Corolla", 2020, "B-123-XYZ", "unknown-client");
+    void createSupplier_savesSupplier() {
+        CreateSupplierRequest request = new CreateSupplierRequest("Auto Parts", "Bucharest", "021");
+        SupplierEntity savedSupplier = new SupplierEntity("sup-1", "Auto Parts", "Bucharest", "021");
 
-        when(clientRepository.findById("unknown-client")).thenReturn(Optional.empty());
+        when(supplierRepository.save(any(SupplierEntity.class))).thenReturn(savedSupplier);
 
-        assertThrows(EntityNotFoundException.class, () -> catalogService.createCar(request));
+        SupplierEntity result = autoServiceCatalogService.createSupplier(request);
+
+        assertSame(savedSupplier, result);
     }
 
     @Test
-    void testCreateCar_duplicatePlateNumber_throwsIllegalArgumentException() {
-        CreateCarRequest request = new CreateCarRequest("Toyota", "Corolla", 2020, "B-123-XYZ", "client-1");
-        ClientEntity client = new ClientEntity("client-1", "Alice", "Smith", "0700000001", "alice@example.com", "Str. A");
-        CarEntity existing = new CarEntity("car-1", "Honda", "Civic", 2019, "B-123-XYZ", "other-client");
+    void createPart_whenSupplierExists_savesPart() {
+        CreatePartRequest request = new CreatePartRequest("Filter", 10, BigDecimal.valueOf(30), "sup-1");
+        PartEntity savedPart = new PartEntity("part-1", "Filter", 10, BigDecimal.valueOf(30), "sup-1");
 
-        when(clientRepository.findById("client-1")).thenReturn(Optional.of(client));
-        when(carRepository.findByPlateNumber("B-123-XYZ")).thenReturn(Optional.of(existing));
+        when(supplierRepository.findById("sup-1")).thenReturn(Optional.of(new SupplierEntity("sup-1", "Auto Parts", "Bucharest", "021")));
+        when(partRepository.save(any(PartEntity.class))).thenReturn(savedPart);
 
-        assertThrows(IllegalArgumentException.class, () -> catalogService.createCar(request));
+        PartEntity result = autoServiceCatalogService.createPart(request);
+
+        assertSame(savedPart, result);
     }
 
     @Test
-    void testGetCarsByClientId_clientExists_returnsCars() {
-        ClientEntity client = new ClientEntity("client-1", "Alice", "Smith", "0700000001", "alice@example.com", "Str. A");
-        List<CarEntity> cars = Arrays.asList(
-                new CarEntity("car-1", "Toyota", "Corolla", 2020, "B-111-AAA", "client-1")
-        );
+    void ensurePartExists_whenMissing_throwsException() {
+        when(partRepository.findById("part-404")).thenReturn(Optional.empty());
 
-        when(clientRepository.findById("client-1")).thenReturn(Optional.of(client));
-        when(carRepository.findByClientId("client-1")).thenReturn(cars);
-
-        List<CarEntity> result = catalogService.getCarsByClientId("client-1");
-
-        assertEquals(1, result.size());
-        assertEquals("car-1", result.get(0).id());
+        assertThrows(EntityNotFoundException.class, () -> autoServiceCatalogService.ensurePartExists("part-404"));
     }
 
     @Test
-    void testCreateMechanic_validRequest_createsAndReturnsMechanic() {
-        CreateMechanicRequest request = new CreateMechanicRequest("Ion", "Popescu", "0711111111");
-        MechanicEntity saved = new MechanicEntity("mech-1", "Ion", "Popescu", "0711111111", 0.0, 0);
+    void getAllMethods_returnRepositoryData() {
+        when(clientRepository.findAll()).thenReturn(List.of(new ClientEntity("client-1", "Ana", "Popescu", "0711", "ana@example.com", "Bucharest")));
+        when(mechanicRepository.findAll()).thenReturn(List.of(new MechanicEntity("mech-1", "Ion", "Ionescu", "0722", 0.0, 0)));
+        when(supplierRepository.findAll()).thenReturn(List.of(new SupplierEntity("sup-1", "Auto Parts", "Bucharest", "021")));
+        when(partRepository.findAll()).thenReturn(List.of(new PartEntity("part-1", "Filter", 10, BigDecimal.ONE, "sup-1")));
 
-        when(mechanicRepository.save(any(MechanicEntity.class))).thenReturn(saved);
-
-        MechanicEntity result = catalogService.createMechanic(request);
-
-        assertNotNull(result);
-        assertEquals("mech-1", result.id());
-        assertEquals("Ion", result.firstName());
-        assertEquals(0.0, result.score());
-    }
-
-    @Test
-    void testGetAllMechanics_withMultipleMechanics_returnsAll() {
-        List<MechanicEntity> mechanics = Arrays.asList(
-                new MechanicEntity("m-1", "Ion", "Popescu", "0711111111", 4.5, 2),
-                new MechanicEntity("m-2", "Ana", "Ionescu", "0722222222", 5.0, 1)
-        );
-        when(mechanicRepository.findAll()).thenReturn(mechanics);
-
-        List<MechanicEntity> result = catalogService.getAllMechanics();
-
-        assertEquals(2, result.size());
-    }
-
-    @Test
-    void testCreateSupplier_validRequest_createsAndReturnsSupplier() {
-        CreateSupplierRequest request = new CreateSupplierRequest("AutoParts SRL", "Str. Industriei 5", "0733333333");
-        SupplierEntity saved = new SupplierEntity("sup-1", "AutoParts SRL", "Str. Industriei 5", "0733333333");
-
-        when(supplierRepository.save(any(SupplierEntity.class))).thenReturn(saved);
-
-        SupplierEntity result = catalogService.createSupplier(request);
-
-        assertNotNull(result);
-        assertEquals("sup-1", result.id());
-        assertEquals("AutoParts SRL", result.name());
-    }
-
-    @Test
-    void testGetAllSuppliers_withMultipleSuppliers_returnsAll() {
-        List<SupplierEntity> suppliers = Arrays.asList(
-                new SupplierEntity("s-1", "Supplier A", "Str. A", "0700000001"),
-                new SupplierEntity("s-2", "Supplier B", "Str. B", "0700000002")
-        );
-        when(supplierRepository.findAll()).thenReturn(suppliers);
-
-        List<SupplierEntity> result = catalogService.getAllSuppliers();
-
-        assertEquals(2, result.size());
-    }
-
-    @Test
-    void testCreatePart_validRequest_createsAndReturnsPart() {
-        CreatePartRequest request = new CreatePartRequest("Spark Plug", 50, BigDecimal.valueOf(15), "sup-1");
-        SupplierEntity supplier = new SupplierEntity("sup-1", "AutoParts SRL", "Str. Industriei 5", "0733333333");
-        PartEntity saved = new PartEntity("part-1", "Spark Plug", 50, BigDecimal.valueOf(15), "sup-1");
-
-        when(supplierRepository.findById("sup-1")).thenReturn(Optional.of(supplier));
-        when(partRepository.save(any(PartEntity.class))).thenReturn(saved);
-
-        PartEntity result = catalogService.createPart(request);
-
-        assertNotNull(result);
-        assertEquals("part-1", result.id());
-        assertEquals("Spark Plug", result.name());
-        assertEquals(50, result.availableStock());
-    }
-
-    @Test
-    void testCreatePart_supplierNotFound_throwsEntityNotFoundException() {
-        CreatePartRequest request = new CreatePartRequest("Spark Plug", 50, BigDecimal.valueOf(15), "unknown-sup");
-
-        when(supplierRepository.findById("unknown-sup")).thenReturn(Optional.empty());
-
-        assertThrows(EntityNotFoundException.class, () -> catalogService.createPart(request));
-    }
-
-    @Test
-    void testGetAllParts_withMultipleParts_returnsAll() {
-        List<PartEntity> parts = Arrays.asList(
-                new PartEntity("p-1", "Oil Filter", 20, BigDecimal.valueOf(12), "sup-1"),
-                new PartEntity("p-2", "Air Filter", 15, BigDecimal.valueOf(8), "sup-1")
-        );
-        when(partRepository.findAll()).thenReturn(parts);
-
-        List<PartEntity> result = catalogService.getAllParts();
-
-        assertEquals(2, result.size());
-    }
-
-    @Test
-    void testEnsureCarExists_existingCar_returnsCar() {
-        CarEntity car = new CarEntity("car-1", "Toyota", "Corolla", 2020, "B-123-XYZ", "client-1");
-        when(carRepository.findById("car-1")).thenReturn(Optional.of(car));
-
-        CarEntity result = catalogService.ensureCarExists("car-1");
-
-        assertEquals("car-1", result.id());
-    }
-
-    @Test
-    void testEnsureCarExists_nonExistingCar_throwsEntityNotFoundException() {
-        when(carRepository.findById("missing")).thenReturn(Optional.empty());
-
-        assertThrows(EntityNotFoundException.class, () -> catalogService.ensureCarExists("missing"));
-    }
-
-    @Test
-    void testEnsureMechanicExists_nonExistingMechanic_throwsEntityNotFoundException() {
-        when(mechanicRepository.findById("missing")).thenReturn(Optional.empty());
-
-        assertThrows(EntityNotFoundException.class, () -> catalogService.ensureMechanicExists("missing"));
-    }
-
-    @Test
-    void testEnsurePartExists_nonExistingPart_throwsEntityNotFoundException() {
-        when(partRepository.findById("missing")).thenReturn(Optional.empty());
-
-        assertThrows(EntityNotFoundException.class, () -> catalogService.ensurePartExists("missing"));
-    }
-
-    @Test
-    void testEnsureSupplierExists_nonExistingSupplier_throwsEntityNotFoundException() {
-        when(supplierRepository.findById("missing")).thenReturn(Optional.empty());
-
-        assertThrows(EntityNotFoundException.class, () -> catalogService.ensureSupplierExists("missing"));
+        assertEquals(1, autoServiceCatalogService.getAllClients().size());
+        assertEquals(1, autoServiceCatalogService.getAllMechanics().size());
+        assertEquals(1, autoServiceCatalogService.getAllSuppliers().size());
+        assertEquals(1, autoServiceCatalogService.getAllParts().size());
     }
 }

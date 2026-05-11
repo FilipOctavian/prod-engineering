@@ -68,4 +68,31 @@ NOTE: for a live demo, please check out [this youtube video](https://youtu.be/-9
 * You can access the MongoDB Admin UI at:
   * http://localhost:8090
   * default credentials: username `unibuc`, password `adobe`
-  * database `test` contains application entities
+  * database `autoservice` contains application entities
+
+# Auto Service APIs
+
+This project now includes a SaaS-style Auto Service solution implemented with Spring Boot + MongoDB, exposing REST APIs and a lightweight web UI.
+
+Main resources:
+* `/api/clients`
+* `/api/cars`
+* `/api/mechanics`
+* `/api/suppliers`
+* `/api/parts`
+* `/api/service-orders`
+* `/api/deliveries/receive`
+
+Business logic implemented:
+* A service order can be created only for existing car + mechanic + parts.
+* Required parts are validated against stock.
+* Stock is decreased automatically when an order is created.
+* Order total is computed automatically as `laborCost + partsCost`.
+* Completing an order transitions status to `COMPLETED` and sets completion time.
+
+# Web UI
+
+A browser UI is available and served by Spring Boot static resources:
+* Start MongoDB and application (`./start_mongo_only.sh`, then `./gradlew bootRun` or Windows equivalents)
+* Open: `http://localhost:8080/`
+* The UI allows creating clients/cars/mechanics/suppliers/parts, placing service orders, marking orders as completed, and receiving deliveries that increase part stock.

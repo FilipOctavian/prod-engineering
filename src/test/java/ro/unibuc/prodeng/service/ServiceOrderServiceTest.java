@@ -1,6 +1,7 @@
 package ro.unibuc.prodeng.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
@@ -134,5 +135,77 @@ class ServiceOrderServiceTest {
         ServiceOrderResponse response = serviceOrderService.completeOrder("order-1");
 
         assertEquals(OrderStatus.COMPLETED, response.status());
+    }
+
+    @Test
+    void completeOrder_shouldFailWhenAlreadyCompleted() {
+        ServiceOrderEntity completedOrder = new ServiceOrderEntity(
+                "order-1",
+                "car-1",
+                "mech-1",
+                "Brake inspection",
+                "Noise while braking",
+                BigDecimal.valueOf(100),
+                BigDecimal.valueOf(50),
+                BigDecimal.valueOf(150),
+                List.of(),
+                LocalDateTime.of(2026, 3, 5, 10, 0),
+                LocalDateTime.of(2026, 3, 5, 11, 0),
+                OrderStatus.COMPLETED
+        );
+
+        when(serviceOrderRepository.findById("order-1")).thenReturn(Optional.of(completedOrder));
+
+        assertThrows(IllegalArgumentException.class, () -> serviceOrderService.completeOrder("order-1"));
+    }
+
+    @Test
+    void getOrderById_shouldReturnMappedResponse() {
+        ServiceOrderEntity order = new ServiceOrderEntity(
+                "order-1",
+                "car-1",
+                "mech-1",
+                "Brake inspection",
+                "Noise while braking",
+                BigDecimal.valueOf(100),
+                BigDecimal.valueOf(50),
+                BigDecimal.valueOf(150),
+                List.of(),
+                LocalDateTime.of(2026, 3, 5, 10, 0),
+                null,
+                OrderStatus.IN_PROGRESS
+        );
+
+        when(serviceOrderRepository.findById("order-1")).thenReturn(Optional.of(order));
+
+        ServiceOrderResponse response = serviceOrderService.getOrderById("order-1");
+
+        assertEquals("order-1", response.id());
+        assertEquals(OrderStatus.IN_PROGRESS, response.status());
+    }
+
+    @Test
+    void getOrdersByStatus_shouldReturnMappedResponses() {
+        when(serviceOrderRepository.findByStatus(OrderStatus.IN_PROGRESS)).thenReturn(List.of(
+                new ServiceOrderEntity(
+                        "order-1",
+                        "car-1",
+                        "mech-1",
+                        "Brake inspection",
+                        "Noise while braking",
+                        BigDecimal.valueOf(100),
+                        BigDecimal.valueOf(50),
+                        BigDecimal.valueOf(150),
+                        List.of(),
+                        LocalDateTime.of(2026, 3, 5, 10, 0),
+                        null,
+                        OrderStatus.IN_PROGRESS
+                )));
+
+        List<ServiceOrderResponse> responses = serviceOrderService.getOrdersByStatus(OrderStatus.IN_PROGRESS);
+
+        assertEquals(1, responses.size());
+        assertNotNull(responses.getFirst().id());
+        assertEquals(OrderStatus.IN_PROGRESS, responses.getFirst().status());
     }
 }
